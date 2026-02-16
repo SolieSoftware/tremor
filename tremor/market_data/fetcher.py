@@ -14,6 +14,26 @@ NODE_CONFIG = {
 }
 
 
+def fetch_daily_node_data(node_name: str, start_date: datetime, end_date: datetime) -> pd.Series:
+    """Fetch daily market data for a causal network node. No resampling.
+
+    Returns raw daily closing prices/levels for use in event study windows.
+    """
+    config = NODE_CONFIG.get(node_name)
+    if not config:
+        raise ValueError(f"Unknown node: {node_name}")
+
+    start_str = start_date.strftime("%Y-%m-%d")
+    end_str = end_date.strftime("%Y-%m-%d")
+
+    if config["source"] == "yahoo":
+        return _fetch_yahoo(config["ticker"], start_str, end_str)
+    elif config["source"] == "FRED":
+        return _fetch_fred_via_yahoo(config["ticker"], start_str, end_str)
+    else:
+        raise ValueError(f"Unknown data source: {config['source']}")
+
+
 def fetch_node_data(node_name: str, start_date: datetime, end_date: datetime) -> pd.Series:
     """Fetch market data for a causal network node over a date range.
 

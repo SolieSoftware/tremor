@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from tremor.api import events, monitor, signals
+from tremor.api import causal_tests, events, monitor, signals
 from tremor.causal.network import load_network
 from tremor.config import settings
 from tremor.models.database import init_db
@@ -43,3 +43,4 @@ app.add_middleware(
 app.include_router(events.router)
 app.include_router(signals.router)
 app.include_router(monitor.router)
+app.include_router(causal_tests.router)

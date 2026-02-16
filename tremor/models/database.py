@@ -97,6 +97,59 @@ class PropagationResult(Base):
     signal: Mapped["Signal"] = relationship(back_populates="propagation_results")
 
 
+class CausalTestResult(Base):
+    __tablename__ = "causal_test_results"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    transform_id: Mapped[str] = mapped_column(
+        String, ForeignKey("signal_transforms.id"), nullable=False
+    )
+    target_node: Mapped[str] = mapped_column(String, nullable=False)
+
+    # Event study window configuration (in trading days)
+    pre_window_days: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    post_window_days: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    gap_days: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # Sample info
+    num_events: Mapped[int] = mapped_column(Integer, nullable=False)
+    num_events_used: Mapped[int] = mapped_column(Integer, nullable=False)
+    num_events_excluded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    excluded_event_ids: Mapped[list] = mapped_column(JSON, default=list)
+
+    # Dose-response regression results (OLS: market_response ~ surprise_magnitude)
+    coefficient: Mapped[float] = mapped_column(Float, nullable=False)
+    std_error: Mapped[float] = mapped_column(Float, nullable=False)
+    t_statistic: Mapped[float] = mapped_column(Float, nullable=False)
+    p_value: Mapped[float] = mapped_column(Float, nullable=False)
+    r_squared: Mapped[float] = mapped_column(Float, nullable=False)
+    conf_interval_lower: Mapped[float] = mapped_column(Float, nullable=False)
+    conf_interval_upper: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Intercept
+    intercept: Mapped[float] = mapped_column(Float, nullable=False)
+    intercept_p_value: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Placebo test results
+    placebo_pre_drift_coeff: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    placebo_pre_drift_pvalue: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    placebo_zero_surprise_coeff: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    placebo_zero_surprise_pvalue: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Aggregate assessment
+    is_causal: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    confidence_level: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Full per-event detail
+    event_details: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    transform: Mapped["SignalTransform"] = relationship()
+
+
 engine = create_engine(
     settings.DATABASE_URL,
     connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
