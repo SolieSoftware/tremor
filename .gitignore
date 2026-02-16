@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+tremor.db
+*.db
+.venv/
+data/*.json
+data/*.graphml
+data/*.csv
+!data/.gitkeep
+CLAUDE.md
