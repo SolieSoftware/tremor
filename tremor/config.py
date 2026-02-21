@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings
 
 
@@ -14,7 +16,12 @@ class Settings(BaseSettings):
     DEFAULT_OVERLAP_BUFFER_DAYS: int = 10
     CAUSAL_SIGNIFICANCE_LEVEL: float = 0.05
 
-    model_config = {"env_prefix": "TREMOR_"}
+    # Ingestion API keys (set via environment variables)
+    FRED_API_KEY: Optional[str] = None
+    POLYGON_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: Optional[str] = None
+
+    model_config = {"env_prefix": "TREMOR_", "env_file": "tremor/.env", "env_file_encoding": "utf-8"}
 
 
 settings = Settings()
