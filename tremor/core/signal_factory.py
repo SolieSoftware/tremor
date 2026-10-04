@@ -22,20 +22,36 @@ def get_matching_transforms(event_type: str, db: Session) -> list[SignalTransfor
 
 
 def compute_signals_for_event(event: Event, db: Session) -> list[Signal]:
-    """Compute signals for an event using all matching transforms."""
+    """Compute signals for an event using all matching transforms.
+
+    Idempotent: a transform that already produced a signal for this event
+    returns the existing signal rather than creating a duplicate.
+    """
     transforms = get_matching_transforms(event.type, db)
     signals = []
+    new_signals = []
 
     for transform in transforms:
+        existing = (
+            db.query(Signal)
+            .filter(Signal.event_id == event.id, Signal.transform_id == transform.id)
+            .first()
+        )
+        if existing:
+            signals.append(existing)
+            continue
+
         try:
             value = safe_eval_expression(transform.transform_expression, event.raw_data)
         except Exception:
             continue
 
+        # Only signals from earlier events form the baseline, so backfilled
+        # history doesn't let later surprises leak into an earlier z-score
         historical_values = [
             s.value
             for s in db.query(Signal)
-            .filter(Signal.transform_id == transform.id)
+            .filter(Signal.transform_id == transform.id, Signal.timestamp < event.timestamp)
             .all()
         ]
 
@@ -51,8 +67,9 @@ def compute_signals_for_event(event: Event, db: Session) -> list[Signal]:
         )
         db.add(signal)
         signals.append(signal)
+        new_signals.append(signal)
 
     db.commit()
-    for s in signals:
+    for s in new_signals:
         db.refresh(s)
     return signals

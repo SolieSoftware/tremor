@@ -5,8 +5,9 @@ Adapted from smart-webscraper-products/src/extractors/llm_extractor.py.
 Takes raw HTML, cleans it, sends it to Claude with a per-source JSON
 schema, and returns a validated dict of extracted fields.
 
-Uses claude-sonnet-4-6 at temperature=0.0 for deterministic extraction.
-Requires env var: ANTHROPIC_API_KEY
+Model is configurable via TREMOR_LLM_MODEL (default claude-opus-5-5), run at
+low effort with server-side refusal fallback enabled.
+Requires env var: TREMOR_ANTHROPIC_API_KEY
 """
 
 import json
@@ -68,14 +69,19 @@ class LLMExtractor:
         )
 
         try:
-            message = self._client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=1024,
-                temperature=0.0,
+            message = self._client.beta.messages.create(
+                model=settings.LLM_MODEL,
+                max_tokens=16000,
+                output_config={"effort": "low"},
+                betas=["server-side-fallback-2026-07-01"],
+                fallbacks="default",
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_content}],
             )
-            raw = message.content[0].text.strip()
+            if message.stop_reason == "refusal":
+                logger.warning(f"LLM declined extraction for {url}")
+                return self._empty_result(schema)
+            raw = "".join(b.text for b in message.content if b.type == "text").strip()
             return self._parse_response(raw, schema)
 
         except Exception as e:

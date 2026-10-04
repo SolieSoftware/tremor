@@ -164,11 +164,12 @@ def run():
     shocks = pp("List shocks", resp)
     print(f"\n  Total shocks detected: {len(shocks)}")
     for s in shocks[:3]:
-        print(f"    signal_id={s['id'][:8]}  value={s['value']:.4f}  z={s.get('z_score')}")
+        sig = s["signal"]
+        print(f"    signal_id={sig['id'][:8]}  value={sig['value']:.4f}  z={sig.get('z_score')}  [{s['transform']['name']}]")
 
     # ── 7. Propagation for shocks ──────────────────────────────────────────
     if shocks:
-        shock_id = shocks[0]["id"]
+        shock_id = shocks[0]["signal"]["id"]
         print("\n========================================")
         print(f"STEP 7: View propagation for shock {shock_id[:8]}")
         print("========================================")

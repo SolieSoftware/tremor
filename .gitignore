@@ -9,3 +9,4 @@ data/*.graphml
 data/*.csv
 !data/.gitkeep
 CLAUDE.md
+*.egg-info/

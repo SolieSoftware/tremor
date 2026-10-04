@@ -129,3 +129,47 @@ def test_no_matching_transform(client):
     resp = client.post(f"/signals/compute/{event_id}")
     assert resp.status_code == 200
     assert len(resp.json()) == 0
+
+
+def _register_fed_transform(client):
+    client.post("/signals/transforms", json={
+        "name": "Fed Rate Surprise",
+        "event_types": ["fed_announcement"],
+        "transform_expression": "actual_rate - expected_rate",
+        "node_mapping": "d_fed_funds",
+    })
+
+
+def _create_fed_event(client, timestamp, surprise):
+    resp = client.post("/events", json={
+        "timestamp": timestamp,
+        "type": "fed_announcement",
+        "description": "FOMC decision",
+        "raw_data": {"expected_rate": 4.0, "actual_rate": 4.0 + surprise},
+    })
+    return resp.json()["id"]
+
+
+def test_compute_signals_is_idempotent(client):
+    _register_fed_transform(client)
+    event_id = _create_fed_event(client, "2024-12-18T14:00:00Z", 0.25)
+
+    first = client.post(f"/signals/compute/{event_id}").json()
+    second = client.post(f"/signals/compute/{event_id}").json()
+
+    assert [s["id"] for s in first] == [s["id"] for s in second]
+    assert len(client.get("/signals").json()) == 1
+
+
+def test_zscore_ignores_later_signals(client):
+    _register_fed_transform(client)
+    # Backfill five later events first, then compute an earlier one
+    for month in range(2, 7):
+        eid = _create_fed_event(client, f"2024-{month:02d}-15T14:00:00Z", 0.01 * month)
+        client.post(f"/signals/compute/{eid}")
+
+    earliest = _create_fed_event(client, "2024-01-15T14:00:00Z", 0.05)
+    signals = client.post(f"/signals/compute/{earliest}").json()
+
+    # No earlier history, so z-score is unavailable rather than computed from the future
+    assert signals[0]["z_score"] is None

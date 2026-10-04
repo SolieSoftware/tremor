@@ -72,7 +72,10 @@ class PolygonEarningsIngester(BaseIngester):
             if not period_end:
                 continue
 
-            ts = datetime.strptime(period_end, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            # Earnings are announced weeks after the period closes; the event
+            # study needs the announcement, so prefer the filing date
+            event_date = result.get("filing_date") or period_end
+            ts = datetime.strptime(event_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
             # EPS from income statement
             income = result.get("financials", {}).get("income_statement", {})

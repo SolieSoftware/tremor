@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from tremor.api import causal_tests, events, monitor, signals
+from tremor.causal.baselines import load_baselines
 from tremor.causal.network import load_network
 from tremor.config import settings
 from tremor.models.database import init_db
@@ -15,13 +16,26 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    for path in (settings.CAUSAL_NETWORK_PATH, settings.GRANGER_RESULTS_PATH):
+        try:
+            load_network(path)
+            logger.info("Causal network loaded from %s", path)
+            break
+        except FileNotFoundError:
+            continue
+    else:
+        logger.warning(
+            "No causal network found at %s or %s — starting without network",
+            settings.CAUSAL_NETWORK_PATH,
+            settings.GRANGER_RESULTS_PATH,
+        )
     try:
-        load_network(settings.CAUSAL_NETWORK_PATH)
-        logger.info("Causal network loaded from %s", settings.CAUSAL_NETWORK_PATH)
+        load_baselines(settings.IRF_BASELINES_PATH)
+        logger.info("IRF baselines loaded from %s", settings.IRF_BASELINES_PATH)
     except FileNotFoundError:
         logger.warning(
-            "Causal network file not found at %s — starting without network",
-            settings.CAUSAL_NETWORK_PATH,
+            "IRF baselines not found at %s — propagation directions default to positive",
+            settings.IRF_BASELINES_PATH,
         )
     yield
 

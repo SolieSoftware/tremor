@@ -20,7 +20,7 @@ from tremor.ingestion.scrapers.llm_extractor import LLMExtractor
 
 logger = logging.getLogger(__name__)
 
-FED_CALENDAR_URL = "https://www.federalreserve.gov/monetarypolicy/fomccalendar.htm"
+FED_CALENDAR_URL = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
 FED_SPEECHES_URL = "https://www.federalreserve.gov/newsevents/speeches.htm"
 
 # LLM schema for rate decision press releases
@@ -120,22 +120,17 @@ class FedScraper(BaseIngester):
         return payloads
 
     def _extract_release_urls(self, html: str, limit: int) -> list[str]:
-        """Parse the FOMC calendar page to find press release links."""
+        """Parse the FOMC calendar page for statement links, newest first."""
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(html, "lxml")
-        links = soup.find_all("a", href=re.compile(r"/newsevents/pressreleases/monetary\d+"))
+        links = soup.find_all("a", href=re.compile(r"/newsevents/pressreleases/monetary\d{8}a\.htm$"))
         base = "https://www.federalreserve.gov"
-        seen = set()
-        urls = []
-        for link in links:
-            href = link.get("href", "")
-            full = base + href if href.startswith("/") else href
-            if full not in seen:
-                seen.add(full)
-                urls.append(full)
-            if len(urls) >= limit:
-                break
-        return urls
+        urls = {
+            base + href if href.startswith("/") else href
+            for href in (link.get("href", "") for link in links)
+        }
+        # The calendar lists meetings oldest-first; the URL embeds YYYYMMDD
+        return sorted(urls, key=lambda u: self._extract_date_from_url(u) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)[:limit]
 
     def _extract_date_from_url(self, url: str) -> Optional[datetime]:
         """Try to parse a date from URL patterns like /monetary20240131a.htm"""

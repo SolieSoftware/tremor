@@ -1,12 +1,12 @@
 """RSS news feed scraper for geopolitical events.
 
-Polls Reuters and AP RSS feeds for market-relevant news, fetches the
+Polls public news RSS feeds for market-relevant stories, fetches the
 full article text with Playwright, and extracts structured fields via
 the LLM extractor.
 
-Sources:
-- Reuters top news RSS
-- AP top news RSS (via rsshub or direct)
+Sources (Reuters and AP retired their public feeds):
+- BBC News business and world feeds
+- Guardian economics feed
 """
 
 import logging
@@ -24,8 +24,9 @@ from tremor.ingestion.scrapers.llm_extractor import LLMExtractor
 logger = logging.getLogger(__name__)
 
 RSS_FEEDS = {
-    "Reuters": "https://feeds.reuters.com/reuters/topNews",
-    "AP": "https://rsshub.app/apnews/topics/ap-top-news",
+    "BBC Business": "https://feeds.bbci.co.uk/news/business/rss.xml",
+    "BBC World": "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "Guardian Economics": "https://www.theguardian.com/business/economics/rss",
 }
 
 # Keywords that suggest market-moving geopolitical relevance
@@ -38,20 +39,6 @@ RELEVANCE_KEYWORDS = {
 }
 
 # LLM schema for geopolitical news articles
-GEO_SCHEMA = {
-    "summary_text": "2-3 sentence factual summary of the event and its potential market impact",
-    "event_category": "conflict | sanctions | election | policy | trade | natural_disaster | financial | other",
-    "countries_involved": "array of country names as strings",
-    "severity": "low | medium | high",
-    "market_relevance": "fx | rates | equities | commodities | broad | none",
-    "affected_sectors": "array of sector names (e.g. ['energy', 'technology'])",
-    "vix_before": null,
-    "vix_after": null,
-    "spread_before": null,
-    "spread_after": null,
-}
-
-# Remove null literal — just use the schema as a plain dict with string descriptions
 GEO_SCHEMA = {
     "summary_text": "2-3 sentence factual summary of the event and its potential market impact",
     "event_category": "one of: conflict | sanctions | election | policy | trade | natural_disaster | financial | other",
@@ -70,14 +57,14 @@ class RssScraper(BaseIngester):
 
     async def fetch(
         self,
-        feed_name: str = "Reuters",
+        feed_name: str = "BBC Business",
         limit: int = 10,
         relevance_filter: bool = True,
     ) -> list[EventPayload]:
         """Fetch and process articles from an RSS feed.
 
         Args:
-            feed_name: Key in RSS_FEEDS dict ("Reuters" or "AP")
+            feed_name: Key in RSS_FEEDS dict
             limit: Max number of articles to process
             relevance_filter: If True, skip articles with no market-relevant keywords
 
@@ -169,7 +156,7 @@ class RssScraper(BaseIngester):
         category = fields.get("event_category", "other")
         severity = fields.get("severity", "medium")
 
-        tags = ["geopolitical", feed_name.lower(), category]
+        tags = ["geopolitical", feed_name.lower().replace(" ", "_"), category]
         if severity == "high":
             tags.append("high_severity")
 

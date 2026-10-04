@@ -6,7 +6,7 @@ Event-driven causal shock monitor for financial markets.
 
 Tremor lets you register economic and financial events (Fed announcements, earnings releases, geopolitical shocks, economic data releases), transform them into quantified signals via a configurable signal factory, detect when signals constitute shocks, and monitor whether those shocks propagate through a causal network of financial variables as predicted by Granger causality and Structural VAR analysis.
 
-Events can be entered manually via the API, ingested automatically from structured data sources (FRED, Polygon.io), or scraped from unstructured web sources (Federal Reserve press releases, news RSS feeds, White House briefings) using an LLM-based extractor.
+Events can be entered manually via the API, ingested automatically from structured data sources (FRED, Polygon.io), or scraped from unstructured web sources (Federal Reserve press releases, BBC/Guardian news RSS feeds, White House briefings) using an LLM-based extractor.
 
 ## Architecture
 
@@ -60,6 +60,10 @@ Events can be entered manually via the API, ingested automatically from structur
 git clone <repo-url> && cd tremor
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
+
+# Optional: LLM scrapers (fed / rss / whitehouse)
+pip install -e ".[scrapers]"
+playwright install chromium
 ```
 
 ### Configure API Keys (optional)
@@ -70,7 +74,11 @@ Set via environment variables (prefix `TREMOR_`):
 export TREMOR_FRED_API_KEY=your_key        # free: fred.stlouisfed.org
 export TREMOR_POLYGON_API_KEY=your_key     # free: polygon.io/dashboard
 export TREMOR_ANTHROPIC_API_KEY=your_key   # for LLM-based scrapers
+export TREMOR_LLM_MODEL=claude-opus-5-5    # optional, extractor model
 ```
+
+Market data needs no keys: Yahoo Finance for VIX and the S&P 500, and FRED's
+public CSV endpoint for fed funds, the 10y yield and the HY credit spread.
 
 Or create `tremor/.env`:
 ```
@@ -133,10 +141,11 @@ python scripts/ingest.py fed --limit 5 --compute-signals
 
 ### RSS news feeds (geopolitical / macro)
 
-Requires `TREMOR_ANTHROPIC_API_KEY`. Scrapes Reuters and AP feeds.
+Requires `TREMOR_ANTHROPIC_API_KEY`. Polls BBC Business (default), BBC World or Guardian Economics.
 
 ```bash
 python scripts/ingest.py rss --limit 10 --compute-signals
+python scripts/ingest.py rss --feed "BBC World" --limit 10
 ```
 
 ### White House briefings
@@ -297,8 +306,18 @@ uvicorn tremor.app:app --reload
 
 ---
 
+## Known Limitations
+
+- **FRED event dates are the reference month, not the release date.** CPI for January is stamped 1 January even though it is published mid-February, so event-study windows for FRED events sit around the wrong day. Fixing this needs release dates from FRED's ALFRED vintage data (`output_type=4`), which also gives first-print values.
+- **No expected values for NFP, GDP or Fed rate decisions.** Only CPI gets an expectation (Cleveland Fed `EXPINF1YR`, a rough proxy), so the NFP, GDP and Fed Rate Surprise transforms never produce signals from ingested data. `tremor/ingestion/api/cme_fedwatch.py` was meant to supply `expected_rate`, but it is not wired into the CLI and CME's page is rendered by JavaScript, so the static scrape is unlikely to work.
+- **Polygon EPS estimates.** The estimates call uses Polygon's retired `v2/reference/financials` endpoint, so `expected_eps` is usually empty.
+- **VIX Spike / Credit Stress / Treasury Yield Shock** need `*_before` / `*_after` fields that no ingester fills in yet.
+- **Overlap exclusion is blunt**: any other event within the buffer excludes a study event, regardless of type.
+
+---
+
 ## Background
 
-Tremor builds on causal analysis of financial market variables using Granger causality testing and Structural VAR models (impulse response functions and forecast error variance decomposition). The causal network and IRF baselines are derived from historical weekly data and loaded at startup from the `data/` directory.
+Tremor builds on causal analysis of financial market variables using Granger causality testing and Structural VAR models (impulse response functions and forecast error variance decomposition). The causal network and IRF baselines are derived from historical weekly data and loaded at startup from the `data/` directory: `causal_network.graphml` (or `granger_results.csv` with columns `cause,effect,f_statistic,p_value,lag`) and `irf_baselines.json`. These files are not committed; without them the server starts with an empty network and propagation monitoring has nothing to track.
 
 The causal event study module provides a complementary, event-driven approach: OLS dose-response regressions test whether the magnitude of an economic surprise predicts the size of the market response, with placebo tests guarding against false positives.

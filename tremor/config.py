@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     FRED_API_KEY: Optional[str] = None
     POLYGON_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
+    LLM_MODEL: str = "claude-opus-5-5"
 
     model_config = {"env_prefix": "TREMOR_", "env_file": "tremor/.env", "env_file_encoding": "utf-8"}
 

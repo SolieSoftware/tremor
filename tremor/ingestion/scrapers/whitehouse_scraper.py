@@ -80,11 +80,12 @@ class WhiteHouseScraper(BaseIngester):
         results = []
         seen = set()
 
-        for article in soup.find_all("article"):
+        # Listing items are WordPress post blocks (older layouts used <article>)
+        for article in soup.select("article, li.wp-block-post"):
             if len(results) >= limit:
                 break
 
-            link = article.find("a", href=re.compile(r"/briefings-statements/"))
+            link = article.find("a", href=re.compile(r"/briefings-statements/\d{4}/"))
             if not link:
                 continue
 

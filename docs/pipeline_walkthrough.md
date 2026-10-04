@@ -555,11 +555,13 @@ The current overlap detector compares CPI events against *all* events in the dat
 
 The correct resolution is to narrow the overlap criterion to only exclude events that are plausibly causally relevant to the same target node. A CPI release and an earnings report for a single stock, for example, should not trigger mutual exclusion for an analysis of S&P 500 index returns. Adding an `event_type` filter to the overlap query would allow fine-grained control over which event types are considered confounders for each study.
 
-### 7.2 Credit Spread Market Data Gap
+### 7.2 Credit Spread Market Data Gap (resolved)
 
-The `d_credit_spread` node maps to FRED series `BAMLH0A0HYM2` (ICE BofA HY Option-Adjusted Spread). This series is available on FRED with a publication lag and limited historical coverage for the recent period. The current `fetch_daily_node_data()` function in the market data fetcher retrieves this from FRED at daily frequency, but there may be gaps during the post-event windows that cause individual events to drop out with "insufficient market data in window" exclusions. This is why the credit spread target was not reported in the initial results — the market data pull was incomplete.
+The `d_fed_funds`, `d_treasury_10y` and `d_credit_spread` nodes were originally fetched "from FRED via yfinance", but yfinance does not serve FRED series and returned no rows. That, rather than FRED's publication lag, is why the credit spread target was missing from the initial results. `fetch_daily_node_data()` now reads these series from FRED's public CSV endpoint (`fredgraph.csv`, no API key), so all five nodes have daily data and the CPI study should be re-run.
 
-The fix is to implement fallback logic: if FRED `BAMLH0A0HYM2` is unavailable for a date, attempt to construct a proxy from ICE BofA data via another source, or use the FRED release with a longer lookback that covers the gap.
+### 7.2a FRED Event Timestamps
+
+FRED observations are dated to the first day of the reference month, and the ingester uses that date as the event timestamp. CPI for month M is actually released around the middle of M+1, so the event-study windows are currently centred roughly six weeks early. The CPI results in Section 6 should be read with that in mind. The fix is to take release dates (and first-print values) from ALFRED via `output_type=4` on the observations endpoint.
 
 ### 7.3 Sample Size — 36 Months of CPI History
 
@@ -588,4 +590,4 @@ The existing architecture fully supports adding new event types without code cha
 
 ---
 
-*Document generated from codebase state as of February 2026.*
+*Document generated from codebase state as of February 2026; Section 7.2 updated October 2026.*

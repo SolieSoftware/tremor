@@ -10,7 +10,7 @@ Usage:
     python scripts/ingest.py polygon --ticker AAPL --limit 8
     python scripts/ingest.py polygon --ticker MSFT --limit 4
     python scripts/ingest.py fed           # scrape latest FOMC releases (needs ANTHROPIC_API_KEY)
-    python scripts/ingest.py rss           # scrape Reuters/AP news (needs ANTHROPIC_API_KEY)
+    python scripts/ingest.py rss           # scrape BBC/Guardian news feeds (needs ANTHROPIC_API_KEY)
     python scripts/ingest.py whitehouse    # scrape White House briefings (needs ANTHROPIC_API_KEY)
 
 Flags:
@@ -168,8 +168,8 @@ async def run_rss(args):
     os.environ["ANTHROPIC_API_KEY"] = key
 
     scraper = RssScraper()
-    print("\n  Scraping Reuters/AP news RSS feeds...")
-    payloads = await scraper.fetch(limit=args.limit)
+    print(f"\n  Scraping {args.feed} RSS feed...")
+    payloads = await scraper.fetch(feed_name=args.feed, limit=args.limit)
     print(f"  → {len(payloads)} relevant news events returned")
     return payloads
 
@@ -235,7 +235,11 @@ async def main():
     p_fed.add_argument("--dry-run", action="store_true")
 
     # RSS
-    p_rss = subparsers.add_parser("rss", help="Scrape Reuters/AP news RSS feeds")
+    p_rss = subparsers.add_parser("rss", help="Scrape news RSS feeds")
+    p_rss.add_argument(
+        "--feed", default="BBC Business",
+        help="Feed to poll: 'BBC Business', 'BBC World' or 'Guardian Economics'",
+    )
     p_rss.add_argument("--limit", type=int, default=10, help="Max articles to process")
     p_rss.add_argument("--since", help="Only return events after YYYY-MM-DD")
     p_rss.add_argument("--compute-signals", action="store_true")
