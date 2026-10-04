@@ -112,9 +112,11 @@ class WhiteHouseScraper(BaseIngester):
         fields: dict,
     ) -> Optional[EventPayload]:
         summary = fields.get("summary_text") or title
-        category = fields.get("event_category", "statement")
-        policy_area = fields.get("policy_area", "other")
-        severity = fields.get("severity", "medium")
+        # The extractor returns null for fields it can't determine, so a
+        # .get() default alone would let None through into tags
+        category = fields.get("event_category") or "statement"
+        policy_area = fields.get("policy_area") or "other"
+        severity = fields.get("severity") or "medium"
 
         tags = ["geopolitical", "whitehouse", category, policy_area]
         if severity == "high":

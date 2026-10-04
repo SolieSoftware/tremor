@@ -153,8 +153,10 @@ class RssScraper(BaseIngester):
         timestamp = self._parse_date(item.get("pub_date", ""))
 
         summary = fields.get("summary_text") or item.get("title") or "Geopolitical event"
-        category = fields.get("event_category", "other")
-        severity = fields.get("severity", "medium")
+        # The extractor returns null for fields it can't determine, so a
+        # .get() default alone would let None through into tags
+        category = fields.get("event_category") or "other"
+        severity = fields.get("severity") or "medium"
 
         tags = ["geopolitical", feed_name.lower().replace(" ", "_"), category]
         if severity == "high":

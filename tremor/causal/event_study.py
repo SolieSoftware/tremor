@@ -140,8 +140,20 @@ def run_event_study(
     pre_returns_arr = np.array(pre_returns)
     post_returns_arr = np.array(post_returns)
 
+    # A target that doesn't move inside the windows (e.g. the fed funds rate
+    # between meetings) or constant surprises leave OLS undefined
+    if np.ptp(post_returns_arr) == 0:
+        raise ValueError(
+            f"'{target_node}' did not move in any post-event window; "
+            "regression is undefined (try a longer --post-window)"
+        )
+    if np.ptp(surprises_arr) == 0:
+        raise ValueError("All surprise values are identical; regression is undefined")
+
     # 5. Dose-response regression: post_return ~ surprise
     reg = _run_ols_regression(surprises_arr, post_returns_arr, significance_level)
+    if not all(np.isfinite(v) for v in reg.values()):
+        raise ValueError(f"Regression for '{target_node}' produced non-finite statistics")
 
     # 6. Placebo test 1: pre-event drift
     pre_drift = _run_placebo_pre_drift(surprises_arr, pre_returns_arr, significance_level)

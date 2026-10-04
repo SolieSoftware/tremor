@@ -63,3 +63,17 @@ def test_whitehouse_parses_post_blocks():
         "Some Statement",
         "2026-10-02T14:28:12-04:00",
     )]
+
+
+def test_null_llm_fields_do_not_break_tags():
+    """The extractor returns null for unknown fields; tags must stay valid strings."""
+    from tremor.ingestion.normaliser import normalise
+    from tremor.ingestion.scrapers.whitehouse_scraper import WhiteHouseScraper
+
+    fields = {"summary_text": None, "event_category": None, "policy_area": None, "severity": None}
+    scraper = WhiteHouseScraper.__new__(WhiteHouseScraper)
+    payload = scraper._build_payload("https://example.gov/x", "Title", datetime(2026, 1, 1), fields)
+
+    event = normalise(payload)
+    assert None not in event.tags
+    assert event.tags[:4] == ["geopolitical", "whitehouse", "statement", "other"]

@@ -305,3 +305,21 @@ def test_feasibility_endpoint(client):
     results = resp.json()
     assert results[0]["feasible"] is True
     assert results[0]["num_events"] == 5
+
+
+@patch("tremor.causal.event_study.fetch_daily_node_data")
+def test_flat_target_returns_400(mock_fetch, client):
+    """A target that never moves (e.g. fed funds between meetings) is a clean 400, not a 500."""
+    transform = _create_transform(client)
+    event_dates, _, _ = _seed_events_with_surprises(client)
+
+    dates = pd.bdate_range(min(event_dates) - timedelta(days=30), max(event_dates) + timedelta(days=30))
+    mock_fetch.return_value = pd.Series(4.33, index=dates)
+
+    resp = client.post("/causal-tests/run", json={
+        "transform_id": transform["id"],
+        "target_node": "d_fed_funds",
+        "exclude_overlapping": False,
+    })
+    assert resp.status_code == 400
+    assert "did not move" in resp.json()["detail"]
